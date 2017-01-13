@@ -1,0 +1,36 @@
+#include <iostream>
+#include <Eigen/Dense>
+#include <Eigen/Core>
+#include <gabor.h>
+#include <imageLoadSave.h>
+
+using namespace std;
+using namespace Eigen;
+
+typedef double RealType;
+
+typedef Eigen::Array < RealType, Dynamic, Dynamic > ImageType;
+
+int main( ) {
+    int xMax = 1000;
+    int yMax = 1000;
+    
+    ImageType image ( xMax, yMax );
+    
+    
+    int cntr = 0;
+    for ( RealType theta = 0; theta < 5.0; theta += 0.2 ) {
+    GaborFnc < RealType > g ( 0.1, 0.1, 1.0, theta );
+    
+    for ( int x = 0; x < xMax; ++x ) {
+        for ( int y = 0; y < yMax; ++y ) {
+          image ( x,y )  = g ( static_cast < RealType > ( x ) / static_cast < RealType > ( xMax ),static_cast < RealType > ( y ) / static_cast < RealType > ( yMax ) );
+        }
+    }
+image *= 255.0;
+string name = "g" + std::to_string( cntr++) + ".bmp";
+    saveBitmap ( name.c_str (), image );
+    
+    }
+}
+
