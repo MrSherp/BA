@@ -6,8 +6,6 @@
 using namespace Eigen;
 using namespace std;
 
-typedef double RealType;
-typedef Eigen::Array <RealType, Dynamic, Dynamic> ImageType;
 
 
 

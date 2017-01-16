@@ -1,23 +1,27 @@
 #include <iostream>
+#include <cstdio>
+#include <ctime>
 #include <Eigen/Dense>
 #include <Eigen/Core>
 #include <imageLoadSave.h>
 #include <editImages.h>
-#include <pockAlgorithm.h>
-
-using namespace Eigen;
-using namespace std;
+#include <pockChambolleAlgorithm.h>
+#include <math.h> 
 
 typedef double RealType;
 typedef Eigen::Array <RealType, Dynamic, Dynamic> ImageType;
 typedef Matrix<RealType, Dynamic, 1> VectorNd;
 typedef Eigen::Matrix <RealType, Dynamic, Dynamic> MatrixN;
-
+typedef ForwardFD < RealType, VectorNd > OperatorType;
 
 int main()
 {
   //MatrixXd m(2,2);m(0,0) = 3;m(1,0) = 2.5;m(0,1) = -1;m(1,1) = m(1,0) + m(0,1);std::cout << "Here is the matrix m:\n" << m << std::endl;VectorXd v(2);v(0) = 4;v(1) = v(0) - 1;std::cout << "Here is the vector v:\n" << v << std::endl;
   
+    std::clock_t start;
+    double duration;
+    start = std::clock();
+    
     int N =200;
     RealType h =1./N;
     cout << h<<std::endl;
@@ -55,18 +59,19 @@ int main()
     //saveBitmap(name3, outimage3);
     //saveBitmap(name4, outimage4); 
     
-    VectorNd v(9);
-    v << 0, 0, 0, 5, 4, 3, 1, 1, 1;
-    VectorNd phi(18);
+    VectorNd v(25);
+    v << 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 8, 4, 4, 4, 4, 1, 1, 1, 1, 1;
+    VectorNd phi(50);
     phi.setZero();
+    ForwardFD < RealType, VectorNd > K ( 5 );
     
-    std::cout << "v:\n" << v <<  std::endl;
-  
-  
-    ForwardFD < RealType, VectorNd > K (  5  );
+    K.apply ( v, phi );
+    std::cout << "phi:\n" << phi << std::endl;
     
-    K.apply(v, phi);
+    divideByMaximumOfOneOrNorm <RealType> ( phi );
+    std::cout << "phi:\n" << phi << std::endl;        
     
-    std::cout << "phi:\n" << phi <<std::endl;
+    duration = ( std::clock() - start ) / (double) CLOCKS_PER_SEC;
+    std::cout<<"printf: "<< duration <<'\n';
 }
 

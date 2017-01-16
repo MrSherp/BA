@@ -2,6 +2,7 @@
 #define CORE_H
 
 #include <sys/stat.h>
+#include <math.h> 
 
 namespace co {
 
@@ -11,6 +12,10 @@ RealType sqr ( const RealType Arg ) {
   return Arg * Arg;
 }
 
+template < typename RealType >
+RealType sqroot ( const RealType Arg ) {
+    return sqrt(Arg);
+}
 // system helper functions
 inline bool checkIfFileExists ( const std::string& Filename ) {
   struct stat buffer;   
