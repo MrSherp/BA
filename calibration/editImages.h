@@ -87,7 +87,7 @@ void fourInOneSameSize(const ImageType& input, ImageType& output) {
     const unsigned int xMax = input.rows();
     const unsigned int yMax = input.cols();    
     
-    output.resize(2*xMax,2*yMax);
+    output.resize( 2 * xMax, 2 * yMax);
     
     for(int y=0; y < yMax; ++y) {
         

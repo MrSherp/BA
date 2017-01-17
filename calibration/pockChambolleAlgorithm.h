@@ -21,13 +21,33 @@ void divideByMaximumOfOneOrNorm( VectorNd& Arg ){
     }
 }
 
+
+
+template < typename RealType, typename VectorNd >
+class ROFDataResolvent {
+    VectorNd& _image;
+    const RealType _lambda;
+    const RealType _hscale;
+  
+public:
+    ROFDataResolvent ( VectorNd& Image, RealType Lambda )
+:   _image ( Image ), _lambda ( Lambda ), _hscale ( static_cast < RealType > (1) ) { }
+  
+    void apply ( VectorNd& Arg, const RealType Tau ) const { 
+        Arg += Tau * _lambda * _hscale * _image;
+        Arg /= (1. + Tau * _lambda * _hscale);
+    }
+};
+
+
+
 template < typename RealType, typename OperatorType, typename ResolventDataTerm, typename VectorNd >
 void ChambollePockAlgorithm1 ( VectorNd& PrimalSolution,
     VectorNd& DualSolution, const OperatorType& K, ResolventDataTerm& ResolventOfG, const RealType tau, const RealType sigma, const int maxIter, const RealType StopEpsilon, int& enditer, RealType& endepsilon ) {
-  VectorNd xBar = PrimalSolution;                                               //( PrimalSolution, aol::DEEP_COPY );
-  VectorNd oldPrimalSolution = PrimalSolution;                                  //( PrimalSolution, aol::STRUCT_COPY );
-  VectorNd adjointOfDual = PrimalSolution;
-  VectorNd gradientOfXBar = DualSolution ;
+  VectorNd xBar ( PrimalSolution ) ;                                               //( PrimalSolution, aol::DEEP_COPY );
+  VectorNd oldPrimalSolution ( PrimalSolution );                                  //( PrimalSolution, aol::STRUCT_COPY );
+  VectorNd adjointOfDual ( PrimalSolution );
+  VectorNd gradientOfXBar ( DualSolution );
 
   int iter;
   for ( iter = 0; iter < maxIter; ++iter ) { 
@@ -66,13 +86,14 @@ void ChambollePockAlgorithm1 ( VectorNd& PrimalSolution,
 }
 
 
+
 template < typename RealType, typename OperatorType, typename ResolventDataTerm, typename VectorNd >
 void ChambollePockAlgorithm2 ( VectorNd& PrimalSolution,
     VectorNd& DualSolution, const OperatorType& K, ResolventDataTerm& ResolventOfG, const RealType gamma, RealType& tau, RealType& sigma, const int maxIter, const RealType StopEpsilon, int& enditer, RealType& endepsilon ) {
-  VectorNd xBar = PrimalSolution;
-  VectorNd oldPrimalSolution = PrimalSolution;
-  VectorNd adjointOfDual = PrimalSolution;
-  VectorNd gradientOfXBar = DualSolution;
+  VectorNd xBar ( PrimalSolution );
+  VectorNd oldPrimalSolution ( PrimalSolution );
+  VectorNd adjointOfDual ( PrimalSolution );
+  VectorNd gradientOfXBar ( DualSolution );
   RealType theta = 1.;                                                          // aol::ZOTrait<RealType>::one;
 
   int iter;
@@ -98,7 +119,7 @@ void ChambollePockAlgorithm2 ( VectorNd& PrimalSolution,
     
     if ( iter % 10 == 0 && iter != 0 ) {
       oldPrimalSolution -= PrimalSolution;
-     if ( oldPrimalSolution.squaredNorm ()   < StopEpsilon ) { //(l_2^2-Norm)
+     if ( oldPrimalSolution.squaredNorm () < StopEpsilon ) { //(l_2^2-Norm)
 	endepsilon = oldPrimalSolution.squaredNorm ();
 	enditer = iter;
         cout << "Number of required iterations: " << iter << endl;
@@ -115,6 +136,7 @@ void ChambollePockAlgorithm2 ( VectorNd& PrimalSolution,
   cout << "\ntheta: " << theta << "\ntau  : " << tau << "\nsigma: " << sigma << "\ngamma: " << gamma << endl;
   cout << "\ntau*gamma:" << tau*gamma << endl;
 }
+
 
 
 template < typename RealType, typename VectorNd > 
@@ -137,7 +159,6 @@ public:
     Dest.head( _numX * _numX) += _matX * Arg;                                                                                             //_matX->applyAdd ( Arg, Dest[0] );
     Dest.tail( _numX * _numX) += _matY * Arg;
   }
-
   
   void apply ( const VectorNd& Arg, VectorNd& Dest ) const {
     Dest.setZero();
@@ -148,23 +169,19 @@ public:
     Dest += _matX.transpose() * Arg.head( _numX * _numX );
     Dest += _matY.transpose() * Arg.tail( _numX * _numX );
   }
-
   
   void applyAdjoint ( const VectorNd& Arg, VectorNd& Dest ) const {
     Dest.setZero ( );
     this->applyAddAdjoint ( Arg, Dest );
   }
   
-  
   const RealType getX ( const int i, const int j) const {
     return _matX.coeff(i,j);  
   }
-
   
   const RealType getY ( const int i, const int j) const {
     return _matY.coeff(i,j);  
   }
-
   
 private:
 void generateX ( Eigen::SparseMatrix < RealType >& MatX  ) {
@@ -181,7 +198,6 @@ void generateX ( Eigen::SparseMatrix < RealType >& MatX  ) {
         nonZeros += 2;
       }
     }
-    
     for ( int y = 0; y < _numX -2; ++y ) {
       const int currentPosition = y * _numX + (_numX - 1);
       tripletList.push_back ( TripletType (currentPosition, currentPosition, -oneOverH ));
@@ -210,14 +226,6 @@ void generateX ( Eigen::SparseMatrix < RealType >& MatX  ) {
         nonZeros += 2;
       }
     }
-    
-   /* for ( int x = 0; x < _numX - 1; ++x ) {
-      const int currentPosition = (_numX - 1 ) * _numX + x;
-      tripletList.push_back ( TripletType (currentPosition, currentPosition, -oneOverH ));
-      tripletList.push_back ( TripletType (currentPosition, x, oneOverH));
-      nonZeros += 2;
-    }
-*/
     MatY.resize(co::sqr(_numX),co::sqr(_numX));
     MatY.data().squeeze();
     MatY.reserve(Eigen::VectorXi::Constant( co::sqr(_numX) , 6));
@@ -226,34 +234,57 @@ void generateX ( Eigen::SparseMatrix < RealType >& MatX  ) {
   }
 };
 
-
-
-
-
-
-
-
-
-
-
-template <typename VectorNd, typename RealType>
-void algorithm1(int N, VectorNd uL, VectorNd uR, Eigen::MatrixXd v, double eta){
+/* template < typename VectorNd, typename ImageType, typename RealType >
+class Converter {
+    VectorNd _vector;
+    ImageType _image;
     
+public:
     
+    Converter (){}
     
+    void imageToVector ( ImageType& Image){
+        _vector.resize( Image.cols() * Image.rows(), 1);
+        for ( int i = 0; i < Image.rows(); ++i ){
+            _vector.segment( i * Image.cols(), Image.cols() ) = Image.row( i ); 
+        }
+        Image.resize( _vector.size(), 1);
+        Image = _vector;
+    }
     
+    void vectorToImage ( VectorNd& Vector, const int Rows){
+        _image.resize( Rows, Vector.size() / Rows );
+        for ( int i = 0; i < Rows; ++i){
+            _image.row(i) = Vector.segment( i * _image.cols(), _image.cols() );
+        }
+        Vector.resize( Rows, _image.cols() );
+        Vector = _image;
+    }
     
-    
-    
-    
-    
+};
+*/
 
+template < typename VectorNd, typename ImageType, typename RealType >
+void imageToVector ( ImageType& Image){
+    VectorNd _vector( Image.cols() * Image.rows(), 1 );
+    for ( int i = 0; i < Image.rows(); ++i ){
+        _vector.segment( i * Image.cols(), Image.cols() ) = Image.row( i ); 
+    }
+    Image.resize( _vector.size(), 1);
+    Image = _vector;
+}
+
+
+template < typename VectorNd, typename ImageType, typename RealType >
+ImageType vectorToImage ( VectorNd& Vector, const int Rows){
+    ImageType _image( Rows, Vector.size() / Rows );
+    for ( int i = 0; i < Rows; ++i){
+        _image.row(i) = Vector.segment( i * _image.cols(), _image.cols() );
+    }
+    return _image;
 }
 
 
 
 
-void algorithm2(){
-    
-    
-}
+

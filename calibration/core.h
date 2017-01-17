@@ -12,10 +12,7 @@ RealType sqr ( const RealType Arg ) {
   return Arg * Arg;
 }
 
-template < typename RealType >
-RealType sqroot ( const RealType Arg ) {
-    return sqrt(Arg);
-}
+
 // system helper functions
 inline bool checkIfFileExists ( const std::string& Filename ) {
   struct stat buffer;   
