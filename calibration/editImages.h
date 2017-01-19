@@ -36,6 +36,20 @@ void copy(const ImageType& input, ImageType& output){
 
 
 
+template < typename ImageType >
+void scaleToZeroOne ( ImageType& Arg ){
+    Arg /= 255; 
+}
+
+
+
+template < typename ImageType >
+void scaleToFull ( ImageType& Arg ){
+    Arg *= 255; 
+}
+
+
+
 template < typename ImageType>
 void mirrorImage(const ImageType& input, ImageType& output) {
     

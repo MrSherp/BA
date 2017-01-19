@@ -41,9 +41,40 @@ public:
 
 
 
-template < typename RealType, typename OperatorType, typename ResolventDataTerm, typename VectorNd >
+
+template < typename RealType, typename VectorNd >
+class DataResolvent {
+    VectorNd& _image;
+    const RealType _lambda;
+    const RealType _hscale;
+  
+public:
+    DataResolvent ( VectorNd& Image, RealType Lambda )
+:   _image ( Image ), _lambda ( Lambda ), _hscale ( static_cast < RealType > (1) ) { }
+  
+    
+};
+
+
+
+template <typename VectorNd, typename RealType >
+VectorNd partition(Ref<VectorNd>& V, int I, int Dim){
+    if ( V.size() % Dim != 0 ){
+        std::cout << "Dimension does not fit partition!\n" << std::endl;
+        return V;
+    }
+    else{
+        int j = V.size() / Dim;
+        return V.segment( I  * j, j );
+    }
+
+}
+    
+
+
+template < typename RealType, typename OperatorType, typename ROFResolventDataTerm, typename VectorNd >
 void ChambollePockAlgorithm1 ( VectorNd& PrimalSolution,
-    VectorNd& DualSolution, const OperatorType& K, ResolventDataTerm& ResolventOfG, const RealType tau, const RealType sigma, const int maxIter, const RealType StopEpsilon, int& enditer, RealType& endepsilon ) {
+    VectorNd& DualSolution, const OperatorType& K, ROFResolventDataTerm& ResolventOfG, const RealType tau, const RealType sigma, const int maxIter, const RealType StopEpsilon, int& enditer, RealType& endepsilon ) {
   VectorNd xBar ( PrimalSolution ) ;                                               //( PrimalSolution, aol::DEEP_COPY );
   VectorNd oldPrimalSolution ( PrimalSolution );                                  //( PrimalSolution, aol::STRUCT_COPY );
   VectorNd adjointOfDual ( PrimalSolution );
@@ -65,6 +96,11 @@ void ChambollePockAlgorithm1 ( VectorNd& PrimalSolution,
     ResolventOfG.apply ( PrimalSolution, tau );  
     xBar *= -1.;                                                                // xBar.scaleAndAddMultiple( - aol::ZOTrait<RealType>::one, PrimalSolution, aol::ZOTrait<RealType>::one + aol::ZOTrait<RealType>::one ); 
     xBar += 2. * PrimalSolution; 
+    
+    if ( iter % 2500 == 0 && iter != 0 ) {
+        VectorNd epsilon = oldPrimalSolution - PrimalSolution;
+        cout << "\nIterations: " << iter << "\nEpsilon: " << epsilon.squaredNorm() << std::endl;
+    }
     
     if ( iter % 10 == 0 && iter != 0 ) {
       oldPrimalSolution -= PrimalSolution;
