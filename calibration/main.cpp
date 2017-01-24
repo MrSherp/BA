@@ -6,24 +6,13 @@
 #include <imageLoadSave.h>
 #include <editImages.h>
 #include <pockChambolleAlgorithm.h>
-#include <csvLoad.h>
+#include <csvLoadSafe.h>
 #include <math.h> 
 #include <iomanip>
 #include <cstdlib>
 #include <stdlib.h>
-#include <boost/program_options/cmdline.hpp>
-#include <boost/program_options/config.hpp>
-#include <boost/program_options/environment_iterator.hpp>
-#include <boost/program_options/eof_iterator.hpp>
-#include <boost/program_options/errors.hpp>
-#include <boost/program_options/option.hpp>
-#include <boost/program_options/options_description.hpp>
-#include <boost/program_options/parsers.hpp>
-#include <boost/program_options/positional_options.hpp>
-#include <boost/program_options/value_semantic.hpp>
-#include <boost/program_options/variables_map.hpp>
-#include <boost/program_options/version.hpp>
-
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/ini_parser.hpp>
 
 
 typedef double RealType;
@@ -33,96 +22,110 @@ typedef Eigen::Matrix <RealType, Dynamic, Dynamic> MatrixN;
 typedef ForwardFD < RealType, VectorNd > OperatorType;
 typedef ROFDataResolvent < RealType, VectorNd > ROFResolventDataTerm;
 typedef KProjector < RealType, VectorNd > ProjectorOntoK;
+typedef CProjector1 < RealType, VectorNd > ProjectorOntoC;
 
     
-    
-int main(int argc, char **argv)
+int main()
 {
+    //get Parameters_Chambolle
+    boost::property_tree::ptree pt;
+    boost::property_tree::ini_parser::read_ini("config.ini", pt);    
+    RealType lambda = std::stod( pt.get<std::string>("Parameters_Chambolle.lambda") );
+    const RealType gamma = std::stod( pt.get<std::string>("Parameters_Chambolle.gamma") );
+    RealType tau = std::stod( pt.get<std::string>("Parameters_Chambolle.tau") );
+    RealType sigma = std::stod( pt.get<std::string>("Parameters_Chambolle.sigma") );
+    const int maxIter = std::stoi( pt.get<std::string>("Parameters_Chambolle.maxIter") );
+    const RealType stopEpsilon = std::stod( pt.get<std::string>("Parameters_Chambolle.stopEpsilon") );
+    int endIter = std::stoi( pt.get<std::string>("Parameters_Chambolle.endIter") );
+    RealType endEpsilon = std::stod( pt.get<std::string>("Parameters_Chambolle.endEpsilon") );
+    RealType threshhold = std::stod( pt.get<std::string>("Parameters_Others.threshhold") );
     
-    namespace po = boost::program_options;
 
-// Declare the supported options.
-    boost::program_options::options_description desc("Allowed options");
-    desc.add_options()
-    ("help", "produce help message")
-    ("compression", po::value<int>(), "set compression level");
-
-    boost::program_options::variables_map vm;
-
+    //load signals and create imagefunction g
     VectorNd uL;
     VectorNd uR;
+    VectorNd G; 
+    VectorNd Test;
     const char *filename1 = "plot1.csv";
     const char *filename2 = "plot2.csv";
     loadSignal < RealType, VectorNd >(uL, filename1);
     loadSignal < RealType, VectorNd >(uR, filename2);
-    
     int N = uL.size();
+    createG ( uL, uR, G, lambda );    
     std::cout << "N: " << N <<std::endl;
-    signalToIndicatorFunction < VectorNd >( uL ); 
-    signalToIndicatorFunction < VectorNd >( uR ); 
-    VectorNd G (uL - uR);    
+    
 
-    ImageType outimage1;
-    ImageType outimage2;   
-    ImageType outimage3;
-    
-    VectorNd v ( G.size() );
-    v.setConstant ( 1.); 
-    VectorNd w ( v );
-    
+    //create discrete operators for gradient and the projections
     ForwardFD < RealType, VectorNd > Fd ( N );
     KProjector < RealType, VectorNd > K ( G );
-    
-    VectorNd phi ( 2 * v.size() );
-    phi.setZero(); 
-    VectorNd psi ( phi );
-    
-    RealType lambda = 0.3;
-    const RealType gamma = 0.001;
-    RealType tau = 0.01;
-    RealType sigma = 0.03;//1. / ( 16. * tau * static_cast < RealType > ( co::sqr ( N ) ) );
-    const int maxIter = 10000;
-    const RealType stopEpsilon = 0.0000001;
-    int endIter = 0;
-    RealType endEpsilon = 0;
+    CProjector1 < RealType, VectorNd > C ( N );   
     ROFDataResolvent < RealType, VectorNd > Resolvent ( G, lambda );    
     
-   
+    
+    //
+    ImageType outimageSol1;
+    ImageType outimageSol2;   
+    ImageType outimageG;
+    ImageType outimageUL;    
+    VectorNd v ( G.size() );
+    v.setConstant ( 0.); 
+    VectorNd w ( v );
+    VectorNd phi ( 2 * v.size() );
+    phi.setConstant(1); 
+    VectorNd psi ( phi );
+    
+    
+    //start clock for and Algo1
     std::clock_t start1;
     double duration1;
-    start1 = std::clock();
-   
-    ChambollePockAlgorithm1 ( v, phi, Fd, Resolvent, tau, sigma, maxIter, stopEpsilon, endIter, endEpsilon );    
-    std::cout << "\nendIter: " << endIter << "\nendEpsilon: " << endEpsilon << std::endl;
+    start1 = std::clock();   
+    ChambollePockAlgorithm1 ( v, phi, N, Fd, C, K, tau, sigma, maxIter, stopEpsilon, endIter, endEpsilon );    
+    std::cout << std::endl << "endIter: " << endIter << "\nendEpsilon: " << endEpsilon << std::endl;
+
     
-    outimage1.resize ( N, N);
-    outimage1 = vectorToImage < VectorNd, ImageType, RealType >( v , N );
-    scaleToFull ( outimage1 );
-    string name1 = "test1.bmp";
-    saveBitmap(name1, outimage1);    
-    
+    //save result and stop clock
+    outimageSol1.resize ( N, N);
+    outimageSol1 = vectorToImage < VectorNd, ImageType, RealType >( v , N );
+    scaleToFull < RealType, ImageType > ( outimageSol1 );
+    string name1 = "solution1.bmp";
+    saveBitmap(name1, outimageSol1);        
     duration1 = ( std::clock() - start1 ) / (double) CLOCKS_PER_SEC;
     std::cout<<"Duration1: "<< duration1 <<'\n';
     
     
+    //start clock for and Algo2
     std::clock_t start2;
     double duration2;
-    start2 = std::clock();    
-    
-    ChambollePockAlgorithm2 ( w, psi, Fd, Resolvent, gamma, tau, sigma, maxIter, stopEpsilon, endIter, endEpsilon );
+    start2 = std::clock();        
+    ChambollePockAlgorithm2 ( w, psi, N, Fd, C, K, gamma, tau, sigma, maxIter, stopEpsilon, endIter, endEpsilon );
     std::cout << "\nendIter: " << endIter << "\nendEpsilon: " << endEpsilon << std::endl;
         
-    outimage2.resize ( N, N);
-    outimage2 = vectorToImage < VectorNd, ImageType, RealType >( w , N );
-    scaleToFull ( outimage2 );  
-    string name2 = "test2.bmp"; 
-    saveBitmap(name2, outimage2); 
     
+    //save result and stop clock
+    outimageSol2.resize ( N, N);
+    outimageSol2 = vectorToImage < VectorNd, ImageType, RealType >( w , N );
+    scaleToFull < RealType, ImageType > ( outimageSol2 );  
+    string name2 = "solution2.bmp"; 
+    saveBitmap(name2, outimageSol2);     
     duration2 = ( std::clock() - start2 ) / (double) CLOCKS_PER_SEC;
     std::cout<<"Duration2: "<< duration2 <<'\n';
+    
+ 
+    // save g image
+    outimageG.resize ( N, N);
+    outimageG = vectorToImage < VectorNd, ImageType, RealType >( G , N );
+    scaleToFull < RealType, ImageType > ( outimageG );  
+    string name4 = "G.bmp"; 
+    saveBitmap(name4, outimageG); 
+    
+    
+    //save result as csv
+    VectorNd result (N);
+    const char *filename3 = "result.csv"; 
+    threshholding < RealType, VectorNd > ( v, result, threshhold );
+    safeSignal < RealType, VectorNd > ( result, filename3 );
     /*
      */
-    
 }
 
 

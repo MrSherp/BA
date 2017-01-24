@@ -4,7 +4,7 @@
 #include <Eigen/Sparse>
 #include <math.h> 
 
-template < typename RealType, typename VectorNd >
+/*template < typename RealType, typename VectorNd >
 void signalToIndicatorFunction( VectorNd& Arg){
     VectorNd tmp (Arg);
     const unsigned int N = Arg.size();
@@ -26,7 +26,7 @@ void signalToIndicatorFunction( VectorNd& Arg){
         Arg( i + ( N - 1 ) * N) = 1;        
     }
 }
-
+*/
 
 template < typename RealType, typename VectorNd >
 void divideByMaximumOfOneOrNorm( VectorNd& Arg ){
@@ -47,25 +47,36 @@ void divideByMaximumOfOneOrNorm( VectorNd& Arg ){
 
 
 template < typename RealType, typename VectorNd >
+void createG ( VectorNd UL, VectorNd UR, VectorNd& Dest, RealType Lambda ){
+    const unsigned int N = UL.size();
+    Dest.resize( co::sqr( N ) );
+    for (int i = 0; i < N; ++i){
+        for ( int j = 0; j < N; ++j){
+            if ( j + i < N)    
+                Dest ( j + (N - 1 - i) * N ) = abs (Lambda * ( UL ( j ) - UR ( j + i ) ));
+            else
+                Dest ( j + (N - 1 - i) * N ) = Lambda * UL ( j );
+        }
+    }   
+}
+
+
+
+template < typename RealType, typename VectorNd >
 class KProjector {
     VectorNd& _image;
   
 public:
-    KProjector ( VectorNd& Image )
-:   _image ( Image ){ }
+    KProjector ( VectorNd& G )
+:   _image ( G ){ }
 
 void projectOntoK( VectorNd& Arg ){
-    int numX = Arg.rows() / 2;
-        for ( int i = 0; i < numX; ++i){
-            RealType scale = 1.;   
-            VectorNd tmp(2);
-            tmp ( 0 ) = Arg ( i );
-            tmp ( 1 ) = Arg ( i + numX ); 
-            if( tmp(0) > 1 ){
-                scale /= tmp(0);
-                Arg( i ) *= scale;
+    int numX = Arg.size() / 2;
+        for ( int i = 0; i < numX; ++i){ 
+            if( Arg( i ) > 1 ){
+                Arg( i ) = 1;
             }   
-            if( tmp(1) < -_image( i ) ){
+            if( Arg( i + numX ) < -_image( i ) ){
                 Arg( i + numX ) = -_image( i );
             }
         }
@@ -93,41 +104,81 @@ public:
 
 
 template < typename RealType, typename VectorNd >
+class CProjector1 {
+    int _N;
+public:
+    CProjector1 ( int M )
+:   _N ( M ) {}
+
 void projectOntoC( VectorNd& Arg ){
-    int N = (int) sqrt( (double) Arg.size());
-    if( sqrt ( (double) Arg.size()) > (double) N){
-        std::cout << "projectOntoC doesn't work - Arg not quadratic" << std::endl;
+    RealType min = Arg.minCoeff();
+    if( min < 0 ){
+        for ( int i = 0; i < _N; ++i){
+            for ( int j = 0; j < _N; ++j){
+                Arg ( i + j * _N ) -= min;
+            }
+        }        
     }
-    else{
-        for( int i = 0; i < N; ++i){
-            Arg(i) = 0;
-            Arg(i + (N-1) * N) = 1;
-        }
-    }        
+    RealType max = Arg.maxCoeff(); 
+    RealType scale = 1. / (max - min);  
+    if( max > 1 ){
+        Arg *= scale;
+    }
+    for( int i = 0; i < _N; ++i){
+        Arg ( i ) = 0;
+        Arg ( i + (_N-1) * _N ) = 1;
+    }
 }
+
+};
 
 
 
 template < typename RealType, typename VectorNd >
-VectorNd partition(VectorNd& V, int I, int Dim){
-    if ( V.size() % Dim != 0 ){
+class CProjector2 {
+    int _N;
+public:
+    CProjector2 ( int M )
+:   _N ( M ) {}
+
+void projectOntoC( VectorNd& Arg ){
+    for ( int i = 0; i < _N; ++i){
+        for ( int j = 0; j < _N; ++j){
+            if(Arg ( i + j * _N ) < 0)
+               Arg ( i + j * _N ) = 0;
+            if(Arg ( i + j * _N ) > 1)
+                Arg ( i + j * _N ) = 1;          
+        }
+    }        
+    for( int i = 0; i < _N; ++i){
+        Arg ( i ) = 0;
+        Arg ( i + (_N-1) * _N ) = 1;
+    }
+}
+
+};
+
+
+
+template < typename RealType, typename VectorNd >
+void partitionInDimension(VectorNd Arg, VectorNd& Dest, int I, int Dim){
+    if ( Arg.size() % Dim != 0 ){
         std::cout << "Dimension does not fit partition!\n" << std::endl;
-        return V;
     }
     else{
-        int j = V.size() / Dim;
-        return V.segment( I  * j, j );
+        int j = Arg.size() / Dim;
+        Dest = Arg.segment( I  * j, j );
     }
 
 }
     
 
 
-template < typename RealType, typename OperatorType, typename ResolventDataTerm, typename VectorNd >
+template < typename RealType, typename VectorNd, typename OperatorType, typename ProjectorOntoC, typename ProjectorOntoK >
 void ChambollePockAlgorithm1 ( VectorNd& PrimalSolution,
-    VectorNd& DualSolution, const OperatorType& K, ResolventDataTerm& ResolventOfG , const RealType tau, const RealType sigma, const int maxIter, const RealType StopEpsilon, int& enditer, RealType& endepsilon ) {
-  VectorNd xBar ( PrimalSolution ) ;                                               //( PrimalSolution, aol::DEEP_COPY );
-  VectorNd oldPrimalSolution ( PrimalSolution );                                  //( PrimalSolution, aol::STRUCT_COPY );
+    VectorNd& DualSolution, const int N, const OperatorType& K, ProjectorOntoC& ResolventOfG, ProjectorOntoK& ResolventOfH,  const RealType tau, const RealType sigma, const int maxIter, const RealType StopEpsilon, int& enditer, RealType& endepsilon ) {
+  VectorNd xBar ( PrimalSolution ) ;                                               
+  VectorNd oldPrimalSolution ( PrimalSolution );                                  
   VectorNd adjointOfDual ( PrimalSolution );
   VectorNd gradientOfXBar ( DualSolution );
 
@@ -137,15 +188,15 @@ void ChambollePockAlgorithm1 ( VectorNd& PrimalSolution,
     oldPrimalSolution = PrimalSolution;
     K.apply ( xBar, gradientOfXBar );
     DualSolution += sigma * gradientOfXBar;
-    divideByMaximumOfOneOrNorm < RealType > ( DualSolution );
+    ResolventOfH.projectOntoK ( DualSolution );
     
     //xBar not needed beyond this point, so an update is fine
     xBar = PrimalSolution;
 
     K.applyAdjoint ( DualSolution, adjointOfDual );
     PrimalSolution -= tau * adjointOfDual; 
-    ResolventOfG.apply ( PrimalSolution, tau );
-    xBar *= -1.;                                                                // xBar.scaleAndAddMultiple( - aol::ZOTrait<RealType>::one, PrimalSolution, aol::ZOTrait<RealType>::one + aol::ZOTrait<RealType>::one ); 
+    ResolventOfG.projectOntoC ( PrimalSolution );
+    xBar *= -1.;                                                               
     xBar += 2. * PrimalSolution; 
     
     if ( iter % 2500 == 0 && iter != 0 ) {
@@ -161,7 +212,7 @@ void ChambollePockAlgorithm1 ( VectorNd& PrimalSolution,
         cout << "Number of required iterations: " << iter << endl;
         break;
       }
-      oldPrimalSolution = PrimalSolution;
+      oldPrimalSolution += PrimalSolution;
     }
   }
   if ( iter == maxIter){ 
@@ -169,19 +220,20 @@ void ChambollePockAlgorithm1 ( VectorNd& PrimalSolution,
     oldPrimalSolution -= PrimalSolution;
     endepsilon = oldPrimalSolution.squaredNorm ();
   }
-  cout << "\ntau  : " << tau << "\nsigma: " << sigma << endl;
+  cout << endl << "tau  : " << tau << endl << "sigma: " << sigma << endl;
+
 }
 
 
 
-template < typename RealType, typename OperatorType, typename ResolventDataTerm, typename VectorNd >
+template < typename RealType, typename VectorNd, typename OperatorType, typename ProjectorOntoC, typename ProjectorOntoK >
 void ChambollePockAlgorithm2 ( VectorNd& PrimalSolution,
-    VectorNd& DualSolution, const OperatorType& K, ResolventDataTerm& ResolventOfG, const RealType gamma, RealType& tau, RealType& sigma, const int maxIter, const RealType StopEpsilon, int& enditer, RealType& endepsilon ) {
+    VectorNd& DualSolution, const int N, const OperatorType& K, ProjectorOntoC& ResolventOfG, ProjectorOntoK& ResolventOfH, const RealType gamma, RealType& tau, RealType& sigma, const int maxIter, const RealType StopEpsilon, int& enditer, RealType& endepsilon ) {
   VectorNd xBar ( PrimalSolution );
   VectorNd oldPrimalSolution ( PrimalSolution );
   VectorNd adjointOfDual ( PrimalSolution );
   VectorNd gradientOfXBar ( DualSolution );
-  RealType theta = 1.;                                                          // aol::ZOTrait<RealType>::one;
+  RealType theta = 1.;                                                          
 
   int iter;
   for ( iter = 0; iter < maxIter; ++iter ) {
@@ -189,20 +241,25 @@ void ChambollePockAlgorithm2 ( VectorNd& PrimalSolution,
     oldPrimalSolution = PrimalSolution;
     K.apply ( xBar, gradientOfXBar );
     DualSolution += sigma * gradientOfXBar;
-    divideByMaximumOfOneOrNorm < RealType > ( DualSolution );
+    ResolventOfH.projectOntoK ( DualSolution );
 
     //xBar not needed beyond this point, so an update is fine
     xBar = PrimalSolution;
 
     K.applyAdjoint ( DualSolution, adjointOfDual );
     PrimalSolution -= tau * adjointOfDual;
-    ResolventOfG.apply ( PrimalSolution, tau );
+    ResolventOfG.projectOntoC ( PrimalSolution );
     
     theta = 1. / std::sqrt ( 1. + static_cast < RealType > ( 2 ) * gamma * tau );
     tau *= theta;
     sigma /= theta;
     xBar *= -theta;
     xBar += ( 1. + theta ) * PrimalSolution;                                    //( - theta, PrimalSolution, aol::ZOTrait<RealType>::one + theta );
+    
+    if ( iter % 2500 == 0 && iter != 0 ) {
+        VectorNd epsilon = oldPrimalSolution - PrimalSolution;
+        cout << endl << "Iterations: " << iter << endl << "Epsilon: " << epsilon.squaredNorm() << std::endl;
+    }
     
     if ( iter % 10 == 0 && iter != 0 ) {
       oldPrimalSolution -= PrimalSolution;
@@ -212,7 +269,7 @@ void ChambollePockAlgorithm2 ( VectorNd& PrimalSolution,
         cout << "Number of required iterations: " << iter << endl;
         break;
       }
-      oldPrimalSolution = PrimalSolution;
+      oldPrimalSolution += PrimalSolution;
     }
   }
   if ( iter == maxIter){ 
@@ -220,8 +277,8 @@ void ChambollePockAlgorithm2 ( VectorNd& PrimalSolution,
     oldPrimalSolution -= PrimalSolution;
     endepsilon = oldPrimalSolution.squaredNorm ();
   }
-  cout << "\ntheta: " << theta << "\ntau  : " << tau << "\nsigma: " << sigma << "\ngamma: " << gamma << endl;
-  cout << "\ntau*gamma:" << tau*gamma << endl;
+  cout << endl << "theta: " << theta << endl << "tau  : " << tau << endl << "sigma: " << sigma << endl << "gamma: " << gamma << endl;
+  cout << endl << "tau*gamma:" << tau*gamma << endl;
 }
 
 
@@ -350,26 +407,6 @@ public:
     
 };
 */
-
-template < typename VectorNd, typename ImageType, typename RealType >
-void imageToVector ( ImageType& Image){
-    VectorNd _vector( Image.cols() * Image.rows(), 1 );
-    for ( int i = 0; i < Image.rows(); ++i ){
-        _vector.segment( i * Image.cols(), Image.cols() ) = Image.row( i ); 
-    }
-    Image.resize( _vector.size(), 1);
-    Image = _vector;
-}
-
-
-template < typename VectorNd, typename ImageType, typename RealType >
-ImageType vectorToImage ( VectorNd& Vector, const int Cols){
-    ImageType _image( Cols, Vector.size() / Cols);
-    for ( int i = 0; i < Cols; ++i){
-        _image.col(i) = Vector.segment( i * _image.rows(), _image.rows() );
-    }
-    return _image;
-}
 
 
 
