@@ -55,7 +55,8 @@ void createG ( VectorNd UL, VectorNd UR, VectorNd& Dest, RealType Lambda ){
             if ( j + i < N)    
                 Dest ( j + (N - 1 - i) * N ) = abs (Lambda * ( UL ( j ) - UR ( j + i ) ));
             else
-                Dest ( j + (N - 1 - i) * N ) = Lambda * UL ( j );
+                Dest ( j + (N - 1 - i) * N ) = abs (Lambda * UL ( j ));
+            
         }
     }   
 }
@@ -63,21 +64,41 @@ void createG ( VectorNd UL, VectorNd UR, VectorNd& Dest, RealType Lambda ){
 
 
 template < typename RealType, typename VectorNd >
+void startVectors( VectorNd& V, VectorNd& Phi, VectorNd G, const int N ){
+    const unsigned int Nsquare = V.size();
+    
+    VectorNd tmp (Nsquare);
+    tmp.setZero();
+    Phi << tmp, -G;
+    
+    V.setZero();
+   /* for (int i = 0; i < N; ++i){
+        for ( int j = N/2; j < N; ++j){
+            V( i + j * N ) = 1.;
+        }
+    }   
+    */
+}
+
+
+
+template < typename RealType, typename VectorNd >
 class KProjector {
-    VectorNd& _image;
+    VectorNd _g;
   
 public:
-    KProjector ( VectorNd& G )
-:   _image ( G ){ }
+    KProjector ( VectorNd G )
+:   _g ( G ){ }
 
-void projectOntoK( VectorNd& Arg ){
+void projectOntoK( VectorNd& Arg, int& anzahl ){
     int numX = Arg.size() / 2;
         for ( int i = 0; i < numX; ++i){ 
             if( Arg( i ) > 1 ){
                 Arg( i ) = 1;
             }   
-            if( Arg( i + numX ) < -_image( i ) ){
-                Arg( i + numX ) = -_image( i );
+            if( Arg( i + numX ) < -_g( i ) ){
+                Arg( i + numX ) = -_g( i );
+                anzahl++;
             }
         }
     }
@@ -182,13 +203,14 @@ void ChambollePockAlgorithm1 ( VectorNd& PrimalSolution,
   VectorNd adjointOfDual ( PrimalSolution );
   VectorNd gradientOfXBar ( DualSolution );
 
+  int anzahl = 0;
   int iter;
   for ( iter = 0; iter < maxIter; ++iter ) { 
     
     oldPrimalSolution = PrimalSolution;
     K.apply ( xBar, gradientOfXBar );
     DualSolution += sigma * gradientOfXBar;
-    ResolventOfH.projectOntoK ( DualSolution );
+    ResolventOfH.projectOntoK ( DualSolution, anzahl );
     
     //xBar not needed beyond this point, so an update is fine
     xBar = PrimalSolution;
@@ -199,9 +221,9 @@ void ChambollePockAlgorithm1 ( VectorNd& PrimalSolution,
     xBar *= -1.;                                                               
     xBar += 2. * PrimalSolution; 
     
-    if ( iter % 2500 == 0 && iter != 0 ) {
+    if ( iter % 100 == 0 && iter != 0 ) {
         VectorNd epsilon = oldPrimalSolution - PrimalSolution;
-        cout << "\nIterations: " << iter << "\nEpsilon: " << epsilon.squaredNorm() << std::endl;
+        cout << endl << "Iterations: " << iter << endl << "Anzahl Resolvente Projektionen: " << anzahl << endl << "Epsilon: " << epsilon.squaredNorm() << std::endl;
     }
     
     if ( iter % 10 == 0 && iter != 0 ) {
@@ -220,7 +242,7 @@ void ChambollePockAlgorithm1 ( VectorNd& PrimalSolution,
     oldPrimalSolution -= PrimalSolution;
     endepsilon = oldPrimalSolution.squaredNorm ();
   }
-  cout << endl << "tau  : " << tau << endl << "sigma: " << sigma << endl;
+  cout << endl << "tau  : " << tau << endl << "sigma: " << sigma << endl << "Anzahl Projektionen: " << anzahl << endl;
 
 }
 
@@ -235,13 +257,14 @@ void ChambollePockAlgorithm2 ( VectorNd& PrimalSolution,
   VectorNd gradientOfXBar ( DualSolution );
   RealType theta = 1.;                                                          
 
+  int anzahl = 0;
   int iter;
   for ( iter = 0; iter < maxIter; ++iter ) {
       
     oldPrimalSolution = PrimalSolution;
     K.apply ( xBar, gradientOfXBar );
     DualSolution += sigma * gradientOfXBar;
-    ResolventOfH.projectOntoK ( DualSolution );
+    ResolventOfH.projectOntoK ( DualSolution, anzahl );
 
     //xBar not needed beyond this point, so an update is fine
     xBar = PrimalSolution;
@@ -256,7 +279,7 @@ void ChambollePockAlgorithm2 ( VectorNd& PrimalSolution,
     xBar *= -theta;
     xBar += ( 1. + theta ) * PrimalSolution;                                    //( - theta, PrimalSolution, aol::ZOTrait<RealType>::one + theta );
     
-    if ( iter % 2500 == 0 && iter != 0 ) {
+    if ( iter % 250 == 0 && iter != 0 ) {
         VectorNd epsilon = oldPrimalSolution - PrimalSolution;
         cout << endl << "Iterations: " << iter << endl << "Epsilon: " << epsilon.squaredNorm() << std::endl;
     }

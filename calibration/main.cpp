@@ -38,7 +38,7 @@ int main()
     const RealType stopEpsilon = std::stod( pt.get<std::string>("Parameters_Chambolle.stopEpsilon") );
     int endIter = std::stoi( pt.get<std::string>("Parameters_Chambolle.endIter") );
     RealType endEpsilon = std::stod( pt.get<std::string>("Parameters_Chambolle.endEpsilon") );
-    RealType threshhold = std::stod( pt.get<std::string>("Parameters_Others.threshhold") );
+    RealType threshold = std::stod( pt.get<std::string>("Parameters_Others.threshold") );
     
 
     //load signals and create imagefunction g
@@ -68,10 +68,9 @@ int main()
     ImageType outimageG;
     ImageType outimageUL;    
     VectorNd v ( G.size() );
-    v.setConstant ( 0.); 
+    VectorNd phi ( 2 * v.size() );    
+    startVectors < RealType, VectorNd >( v, phi, G, N );
     VectorNd w ( v );
-    VectorNd phi ( 2 * v.size() );
-    phi.setConstant(1); 
     VectorNd psi ( phi );
     
     
@@ -80,7 +79,7 @@ int main()
     double duration1;
     start1 = std::clock();   
     ChambollePockAlgorithm1 ( v, phi, N, Fd, C, K, tau, sigma, maxIter, stopEpsilon, endIter, endEpsilon );    
-    std::cout << std::endl << "endIter: " << endIter << "\nendEpsilon: " << endEpsilon << std::endl;
+    std::cout << std::endl << "endIter: " << endIter << std::endl << "endEpsilon: " << endEpsilon << std::endl;
 
     
     //save result and stop clock
@@ -88,17 +87,17 @@ int main()
     outimageSol1 = vectorToImage < VectorNd, ImageType, RealType >( v , N );
     scaleToFull < RealType, ImageType > ( outimageSol1 );
     string name1 = "solution1.bmp";
-    saveBitmap(name1, outimageSol1);        
+    saveBitmap(name1, outimageSol1);       
     duration1 = ( std::clock() - start1 ) / (double) CLOCKS_PER_SEC;
-    std::cout<<"Duration1: "<< duration1 <<'\n';
+    std::cout<<"Duration1: "<< duration1 << std::endl;
     
     
-    //start clock for and Algo2
+  /*  //start clock for and Algo2
     std::clock_t start2;
     double duration2;
     start2 = std::clock();        
     ChambollePockAlgorithm2 ( w, psi, N, Fd, C, K, gamma, tau, sigma, maxIter, stopEpsilon, endIter, endEpsilon );
-    std::cout << "\nendIter: " << endIter << "\nendEpsilon: " << endEpsilon << std::endl;
+    std::cout << std::endl << "endIter: " << endIter << std::endl << "endEpsilon: " << endEpsilon << std::endl;
         
     
     //save result and stop clock
@@ -108,8 +107,9 @@ int main()
     string name2 = "solution2.bmp"; 
     saveBitmap(name2, outimageSol2);     
     duration2 = ( std::clock() - start2 ) / (double) CLOCKS_PER_SEC;
-    std::cout<<"Duration2: "<< duration2 <<'\n';
-    
+    std::cout<<"Duration2: "<< duration2 << std::endl;
+    /*
+     */
  
     // save g image
     outimageG.resize ( N, N);
@@ -122,7 +122,7 @@ int main()
     //save result as csv
     VectorNd result (N);
     const char *filename3 = "result.csv"; 
-    threshholding < RealType, VectorNd > ( v, result, threshhold );
+    thresholding < RealType, VectorNd > ( v, result, threshold );
     safeSignal < RealType, VectorNd > ( result, filename3 );
     /*
      */

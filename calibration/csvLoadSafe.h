@@ -53,7 +53,7 @@ void safeSignal ( VectorNd& Signal, const char *Filename ){
 
 
 template < typename RealType, typename VectorNd >
-void threshholding ( VectorNd Image, VectorNd& Signal, const RealType threshhold ){
+void thresholding ( VectorNd Image, VectorNd& Signal, const RealType threshhold ){
     const unsigned int N = Signal.size();
     for ( int i = 0; i < N; ++i){
         if( threshhold > 1 || threshhold < 0 ){
