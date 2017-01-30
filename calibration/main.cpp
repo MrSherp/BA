@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
+#include <boost/filesystem.hpp>
 
 
 typedef double RealType;
@@ -22,7 +23,7 @@ typedef Eigen::Matrix <RealType, Dynamic, Dynamic> MatrixN;
 typedef ForwardFD < RealType, VectorNd > OperatorType;
 typedef ROFDataResolvent < RealType, VectorNd > ROFResolventDataTerm;
 typedef KProjector < RealType, VectorNd > ProjectorOntoK;
-typedef CProjector1 < RealType, VectorNd > ProjectorOntoC;
+typedef CProjector2 < RealType, VectorNd > ProjectorOntoC;
 
     
 int main()
@@ -40,12 +41,20 @@ int main()
     RealType endEpsilon = std::stod( pt.get<std::string>("Parameters_Chambolle.endEpsilon") );
     RealType threshold = std::stod( pt.get<std::string>("Parameters_Others.threshold") );
     
+    
+    
+    //create directory for saving 
+    string saveDirectory = pt.get<std::string>("Directory.safeDirectory");
+    boost::filesystem::path directory (saveDirectory);
+    boost::filesystem::create_directory(directory);
+    boost::filesystem::copy_file("/home/staff/scherping/Build/" ,saveDirectory);
+    
+    
 
     //load signals and create imagefunction g
     VectorNd uL;
     VectorNd uR;
     VectorNd G; 
-    VectorNd Test;
     const char *filename1 = "plot1.csv";
     const char *filename2 = "plot2.csv";
     loadSignal < RealType, VectorNd >(uL, filename1);
@@ -57,9 +66,47 @@ int main()
 
     //create discrete operators for gradient and the projections
     ForwardFD < RealType, VectorNd > Fd ( N );
-    KProjector < RealType, VectorNd > K ( G );
-    CProjector1 < RealType, VectorNd > C ( N );   
-    ROFDataResolvent < RealType, VectorNd > Resolvent ( G, lambda );    
+    KProjector < RealType, VectorNd > K ( G, lambda );
+    CProjector2 < RealType, VectorNd > C ( N );   
+    //ROFDataResolvent < RealType, VectorNd > Resolvent ( G, lambda );    
+    
+    
+    //test mit N = 3
+    
+    /*VectorNd testv (9);
+    VectorNd testimage (9);
+    testimage << 0,0,0,0.2,0.8,0,0,0.6,0;
+    VectorNd testphi (18);
+    testphi.setZero();
+    testv << -1,-2,-3,-4,-6,-8,-9,-12,-15;
+    ForwardFD < RealType, VectorNd > testfd ( 3 );
+    KProjector < RealType, VectorNd > testk ( testimage );
+    CProjector1 < RealType, VectorNd > testc ( 3 );   
+    int j = 0;
+   
+    VectorNd xBar ( testv ) ;    
+    VectorNd oldPrimalSolution ( testv );                                  
+    VectorNd adjointOfDual ( testv );
+    VectorNd gradientOfXBar ( testphi );
+    
+    testfd.apply ( xBar, gradientOfXBar );
+    std::cout << "gradientOfXBar: " << gradientOfXBar << std::endl;
+    gradientOfXBar *= sigma;
+    testphi += gradientOfXBar;
+    std::cout << "testphi: " << testphi << std::endl;
+    testk.projectOntoK ( testphi, j);
+    std::cout << "testphi: " << testphi << std::endl;    
+    xBar = testv;
+    testfd.applyAdjoint ( testphi, adjointOfDual );
+    std::cout << "adjointOfDual: " << adjointOfDual << std::endl;
+    testv -= tau * adjointOfDual; 
+    std::cout << "testv: " << testv << std::endl;
+    testc.projectOntoC ( testv );
+    std::cout << "testv: " << testv << std::endl;
+    xBar *= -1.;                                                               
+    xBar += 2. * testv;    
+    std::cout << "xBar: " << xBar << std::endl;
+    */ 
     
     
     //
@@ -72,7 +119,7 @@ int main()
     startVectors < RealType, VectorNd >( v, phi, G, N );
     VectorNd w ( v );
     VectorNd psi ( phi );
-    
+    /*
     
     //start clock for and Algo1
     std::clock_t start1;
@@ -91,8 +138,8 @@ int main()
     duration1 = ( std::clock() - start1 ) / (double) CLOCKS_PER_SEC;
     std::cout<<"Duration1: "<< duration1 << std::endl;
     
-    
-  /*  //start clock for and Algo2
+    */
+    //start clock for and Algo2
     std::clock_t start2;
     double duration2;
     start2 = std::clock();        
@@ -101,6 +148,7 @@ int main()
         
     
     //save result and stop clock
+    char s[20];
     outimageSol2.resize ( N, N);
     outimageSol2 = vectorToImage < VectorNd, ImageType, RealType >( w , N );
     scaleToFull < RealType, ImageType > ( outimageSol2 );  
@@ -108,6 +156,8 @@ int main()
     saveBitmap(name2, outimageSol2);     
     duration2 = ( std::clock() - start2 ) / (double) CLOCKS_PER_SEC;
     std::cout<<"Duration2: "<< duration2 << std::endl;
+    sprintf ( s, "TVout%05d.png", maxIter );
+    saveBitmap(s, outimageSol2);
     /*
      */
  
@@ -122,7 +172,7 @@ int main()
     //save result as csv
     VectorNd result (N);
     const char *filename3 = "result.csv"; 
-    thresholding < RealType, VectorNd > ( v, result, threshold );
+    thresholding < RealType, VectorNd > ( w, result, threshold );
     safeSignal < RealType, VectorNd > ( result, filename3 );
     /*
      */
