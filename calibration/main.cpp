@@ -40,23 +40,26 @@ int main()
     int endIter = std::stoi( pt.get<std::string>("Parameters_Chambolle.endIter") );
     RealType endEpsilon = std::stod( pt.get<std::string>("Parameters_Chambolle.endEpsilon") );
     RealType threshold = std::stod( pt.get<std::string>("Parameters_Others.threshold") );
+    const char *plot1 = pt.get<std::string>("Images.uL").c_str();
+    const char *plot2 = pt.get<std::string>("Images.uR").c_str();    
+
     
     
-    
-    //create directory for saving 
-    string saveDirectory = pt.get<std::string>("Directory.safeDirectory");
+ /*   //create directory for saving 
+    string saveDirectory = pt.get<std::string>("Directory.saveDirectory");
     boost::filesystem::path directory (saveDirectory);
     boost::filesystem::create_directory(directory);
     boost::filesystem::copy_file("/home/staff/scherping/Build/" ,saveDirectory);
     
-    
+    */
+ 
 
     //load signals and create imagefunction g
     VectorNd uL;
     VectorNd uR;
     VectorNd G; 
-    const char *filename1 = "plot1.csv";
-    const char *filename2 = "plot2.csv";
+    const char *filename1 = plot1;
+    const char *filename2 = plot2;
     loadSignal < RealType, VectorNd >(uL, filename1);
     loadSignal < RealType, VectorNd >(uR, filename2);
     int N = uL.size();
@@ -66,14 +69,13 @@ int main()
 
     //create discrete operators for gradient and the projections
     ForwardFD < RealType, VectorNd > Fd ( N );
-    KProjector < RealType, VectorNd > K ( G, lambda );
+    KProjector < RealType, VectorNd > K ( G );
     CProjector2 < RealType, VectorNd > C ( N );   
     //ROFDataResolvent < RealType, VectorNd > Resolvent ( G, lambda );    
     
-    
+    /*
     //test mit N = 3
-    
-    /*VectorNd testv (9);
+    VectorNd testv (9);
     VectorNd testimage (9);
     testimage << 0,0,0,0.2,0.8,0,0,0.6,0;
     VectorNd testphi (18);
@@ -81,7 +83,7 @@ int main()
     testv << -1,-2,-3,-4,-6,-8,-9,-12,-15;
     ForwardFD < RealType, VectorNd > testfd ( 3 );
     KProjector < RealType, VectorNd > testk ( testimage );
-    CProjector1 < RealType, VectorNd > testc ( 3 );   
+    CProjector2 < RealType, VectorNd > testc ( 3 );   
     int j = 0;
    
     VectorNd xBar ( testv ) ;    
@@ -106,7 +108,7 @@ int main()
     xBar *= -1.;                                                               
     xBar += 2. * testv;    
     std::cout << "xBar: " << xBar << std::endl;
-    */ 
+    */
     
     
     //
@@ -152,12 +154,14 @@ int main()
     outimageSol2.resize ( N, N);
     outimageSol2 = vectorToImage < VectorNd, ImageType, RealType >( w , N );
     scaleToFull < RealType, ImageType > ( outimageSol2 );  
-    string name2 = "solution2.bmp"; 
-    saveBitmap(name2, outimageSol2);     
+    string solutionName = pt.get<std::string>("Parameters_Chambolle.lambda") + "_" + pt.get<std::string>("Parameters_Chambolle.gamma") + "_" + pt.get<std::string>("Parameters_Chambolle.tau") + "_" +
+    pt.get<std::string>("Parameters_Chambolle.sigma") + "_" + pt.get<std::string>("Parameters_Chambolle.maxIter") + "_" + std::to_string(N);
+    string solutionNameBmp = solutionName + ".bmp";
+    saveBitmap(solutionNameBmp, outimageSol2);     
     duration2 = ( std::clock() - start2 ) / (double) CLOCKS_PER_SEC;
     std::cout<<"Duration2: "<< duration2 << std::endl;
-    sprintf ( s, "TVout%05d.png", maxIter );
-    saveBitmap(s, outimageSol2);
+    //sprintf ( s, "TVout%05d.png", maxIter );
+    //saveBitmap(s, outimageSol2);
     /*
      */
  
@@ -171,7 +175,8 @@ int main()
     
     //save result as csv
     VectorNd result (N);
-    const char *filename3 = "result.csv"; 
+    const string solutionNameCsv = solutionName + "Result.csv";
+    const char *filename3 = solutionNameCsv.c_str();
     thresholding < RealType, VectorNd > ( w, result, threshold );
     safeSignal < RealType, VectorNd > ( result, filename3 );
     /*

@@ -47,19 +47,19 @@ void divideByMaximumOfOneOrNorm( VectorNd& Arg ){
 
 
 template < typename RealType, typename VectorNd >
-void createG ( VectorNd UL, VectorNd UR, VectorNd& Dest, RealType Lambda ){
+void createG ( VectorNd UL, VectorNd UR, VectorNd& G, RealType Lambda ){
     const unsigned int N = UL.size();
-    Dest.resize( co::sqr( N ) );
+    G.resize( co::sqr( N ) );
     for (int i = 0; i < N; ++i){
         for ( int j = 0; j < N; ++j){
             /*RealType scale = (N-1) / (N - 1 + i);
             int k = (int) ((RealType) (j + i) * scale);
-            Dest ( j + (N - 1 - i) * N ) = abs ( Lambda * ( UL ( j ) - UR ( k ) ));
+            G ( j + (N - 1 - i) * N ) = abs ( Lambda * ( UL ( j ) - UR ( k ) ));
             */
             if ( j + i < N)    
-                Dest ( j + (N - 1 - i) * N ) = abs (Lambda * ( UL ( j ) - UR ( j + i ) ));
+                G ( j + (N - 1 - i) * N ) = abs (Lambda * ( UL ( j ) - UR ( j + i ) ));
             else
-                Dest ( j + (N - 1 - i) * N ) = abs (Lambda * ( UL ( j ) - UR ( N-1 ) ));
+                G ( j + (N - 1 - i) * N ) = abs (Lambda * ( UL ( j ) - UR ( N-1 ) ));
             
         }
     }   
@@ -81,8 +81,8 @@ void startVectors( VectorNd& V, VectorNd& Phi, VectorNd G, const int N ){
     V.setZero();
     */
     
-    V.setZero();
-    Phi.setZero();
+    V.setConstant( static_cast <RealType> (0) );
+    Phi.setConstant( static_cast <RealType> (1) );
    /* for (int i = 0; i < N; ++i){
         for ( int j = N/2; j < N; ++j){
             V( i + j * N ) = 1.;
@@ -99,8 +99,8 @@ class KProjector {
     const RealType _regularizationWeight;
   
 public:
-    KProjector ( VectorNd G, RealType Regularizer )
-:   _g ( G ), _regularizationWeight ( Regularizer ){ }
+    KProjector ( VectorNd G )
+:   _g ( G ), _regularizationWeight (){ }
 
 void projectOntoK( VectorNd& Arg, int& anzahl ){
     int numX = Arg.size() / 2;
@@ -111,8 +111,8 @@ void projectOntoK( VectorNd& Arg, int& anzahl ){
             if( Arg( i ) < -1 ){
                 Arg( i ) = static_cast < RealType > ( -1 );
             }   
-            if( Arg( i + numX ) < -_g( i ) ){
-                Arg( i + numX ) = -_g( i );
+            if( Arg( i + numX ) > _g( i ) ){
+                Arg( i + numX ) = _g( i );
                 anzahl++;
             }
         }
@@ -178,18 +178,18 @@ public:
 :   _N ( M ) {}
 
 void projectOntoC( VectorNd& Arg ){
+    for( int i = 0; i < _N; ++i){
+        Arg ( i ) = static_cast < RealType > ( 0 );
+        Arg ( i + (_N-1) * _N ) = static_cast < RealType > ( 1 );
+    }
     for ( int i = 0; i < _N; ++i){
-        for ( int j = 0; j < _N; ++j){
+        for ( int j = 1; j < _N-1; ++j){
             if(Arg ( i + j * _N ) < 0)
                 Arg ( i + j * _N ) = static_cast < RealType > ( 0 );
             if(Arg ( i + j * _N ) > 1)
                 Arg ( i + j * _N ) = static_cast < RealType > ( 1 );          
         }
-    }        
-    for( int i = 0; i < _N; ++i){
-        Arg ( i ) = static_cast < RealType > ( 0 );
-        Arg ( i + (_N-1) * _N ) = static_cast < RealType > ( 1 );
-    }
+    }         
 }
 
 };
