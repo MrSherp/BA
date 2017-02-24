@@ -1,0 +1,15 @@
+set terminal eps;
+set output '/home/staff/scherping/Lib/results-49/results.eps';
+unset key;
+set key off;
+set loadpath '/home/staff/scherping/Lib/results-49/';
+set yrange [-0.2:1];
+set size 1,1;
+set origin 0,0;
+set grid ytics lc rgb '#bbbbbb' lw 1 lt 0;
+set grid xtics lc rgb '#bbbbbb' lw 1 lt 0;
+set multiplot layout 2,2 columnsfirst scale 1.1,0.9;
+plot '/home/staff/scherping/Lib/Input/plot1.csv' with lines;
+plot '/home/staff/scherping/Lib/results-49/uRshifted.csv' with lines, '/home/staff/scherping/Lib/results-49/dataFunction.csv' with lines;
+plot '/home/staff/scherping/Lib/Input/plot2.csv' with lines;
+plot 'thresholdedSolution.csv' with lines;

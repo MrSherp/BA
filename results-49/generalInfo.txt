@@ -1,0 +1,2 @@
+DataEnergy: 0.0102763
+BVEnergy: 0.65
