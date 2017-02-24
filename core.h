@@ -12,11 +12,20 @@ RealType sqr ( const RealType Arg ) {
   return Arg * Arg;
 }
 
+template < typename RealType >
+RealType min ( const RealType A, const RealType B ) {
+  if ( A > B )
+    return B;
+  else
+    return A;
+}
 
-// system helper functions
-inline bool checkIfFileExists ( const std::string& Filename ) {
-  struct stat buffer;   
-  return ( stat ( Filename.c_str(), &buffer) == 0 ); 
+template < typename RealType >
+RealType max ( const RealType A, const RealType B ) {
+  if ( A < B )
+    return B;
+  else
+    return A;
 }
 
 
